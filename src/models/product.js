@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 
-let products = [];
+const byId = new Map();
+const bySku = new Map();
 
 const matchesProduct = (product, filters) => {
   const { category, status, minPrice, maxPrice, inStock, search } = filters;
@@ -10,24 +11,41 @@ const matchesProduct = (product, filters) => {
   if (minPrice !== undefined && product.price < minPrice) return false;
   if (maxPrice !== undefined && product.price > maxPrice) return false;
   if (inStock !== undefined && product.stock > 0 !== inStock) return false;
+
   if (search !== undefined) {
     const term = search.toLowerCase();
-    const inName = product.name.toLowerCase().includes(term);
-    const inDescription = (product.description ?? "").toLowerCase().includes(term);
-    if (!inName && !inDescription) return false;
+    if (!product.name.toLowerCase().includes(term)) {
+      const description = product.description ?? "";
+      if (!description.toLowerCase().includes(term)) return false;
+    }
   }
 
   return true;
 };
 
-const findAll = (filters = {}) =>
-  products.filter((product) => product.archivedAt === null && matchesProduct(product, filters));
+const findAll = (filters = {}) => {
+  const results = [];
+  for (const product of byId.values()) {
+    if (product.archivedAt !== null) continue;
+    if (!matchesProduct(product, filters)) continue;
+    results.push(product);
+  }
+  return results;
+};
 
-const findById = (id) => products.find((product) => product.id === id && product.archivedAt === null);
+const findById = (id) => {
+  const product = byId.get(id);
+  return product && product.archivedAt === null ? product : null;
+};
 
-const findBySku = (sku) => products.find((product) => product.sku === sku);
+const findBySku = (sku) => bySku.get(sku) ?? null;
 
 const create = (data) => {
+  if (!data.name) throw new Error("name is required");
+  if (!data.sku) throw new Error("sku is required");
+  if (typeof data.price !== "number" || data.price <= 0) throw new Error("price must be greater than 0");
+  if (bySku.has(data.sku)) throw new Error("sku already exists");
+
   const product = {
     id: uuidv4(),
     name: data.name,
@@ -40,32 +58,50 @@ const create = (data) => {
     createdAt: new Date(),
     archivedAt: null,
   };
-  products.push(product);
+  byId.set(product.id, product);
+  bySku.set(product.sku, product);
   return product;
 };
 
 const update = (id, patch) => {
-  const index = products.findIndex((product) => product.id === id);
-  if (index === -1) return null;
+  const existing = byId.get(id);
+  if (!existing) return null;
 
-  products[index] = { ...products[index], ...patch };
-  return products[index];
+  const { id: _id, createdAt: _createdAt, ...safePatch } = patch;
+  const updated = { ...existing, ...safePatch };
+  byId.set(id, updated);
+
+  if (safePatch.sku !== undefined && safePatch.sku !== existing.sku) {
+    bySku.delete(existing.sku);
+  }
+  bySku.set(updated.sku, updated);
+
+  return updated;
 };
 
 const deleteById = (id) => {
-  const index = products.findIndex((product) => product.id === id && product.archivedAt === null);
-  if (index === -1) return false;
+  const existing = byId.get(id);
+  if (!existing || existing.archivedAt !== null) return false;
 
-  products[index] = { ...products[index], archivedAt: new Date() };
+  const archived = { ...existing, archivedAt: new Date() };
+  byId.set(id, archived);
+  bySku.set(existing.sku, archived);
   return true;
 };
 
 const restore = (id) => {
-  const index = products.findIndex((product) => product.id === id && product.archivedAt !== null);
-  if (index === -1) return null;
+  const existing = byId.get(id);
+  if (!existing || existing.archivedAt === null) return null;
 
-  products[index] = { ...products[index], archivedAt: null };
-  return products[index];
+  const restored = { ...existing, archivedAt: null };
+  byId.set(id, restored);
+  bySku.set(existing.sku, restored);
+  return restored;
 };
 
-export default { findAll, findById, findBySku, create, update, delete: deleteById, restore };
+const reset = () => {
+  byId.clear();
+  bySku.clear();
+};
+
+export default { findAll, findById, findBySku, create, update, delete: deleteById, restore, reset };

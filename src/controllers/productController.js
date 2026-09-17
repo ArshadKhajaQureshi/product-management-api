@@ -3,12 +3,11 @@ import { successResponse } from "../utils/response.js";
 import { ApiError } from "../middleware/errorHandler.js";
 import { catchAsync } from "../middleware/catchAsync.js";
 
-const ALLOWED_FIELDS = ["name", "sku", "description", "category", "price", "stock", "status"];
+const CREATABLE_FIELDS = ["name", "sku", "description", "category", "price", "stock", "status"];
+const PATCHABLE_FIELDS = ["name", "description", "category", "price", "stock", "status"];
 
-const pickAllowedFields = (body) =>
-  Object.fromEntries(
-    ALLOWED_FIELDS.filter((field) => body[field] !== undefined).map((field) => [field, body[field]])
-  );
+const pickFields = (body, fields) =>
+  Object.fromEntries(fields.filter((field) => body[field] !== undefined).map((field) => [field, body[field]]));
 
 const buildFiltersFromQuery = (query) => {
   const filters = {};
@@ -35,7 +34,7 @@ export const getProduct = catchAsync(async (req, res, next) => {
 export const createProduct = catchAsync(async (req, res, next) => {
   if (Product.findBySku(req.body.sku)) return next(new ApiError(409, "sku already exists"));
 
-  const product = Product.create(pickAllowedFields(req.body));
+  const product = Product.create(pickFields(req.body, CREATABLE_FIELDS));
   res.status(201).json(successResponse(product));
 });
 
@@ -43,9 +42,9 @@ export const patchProduct = catchAsync(async (req, res, next) => {
   const existing = Product.findById(req.params.id);
   if (!existing) return next(new ApiError(404, "Product not found"));
 
-  const patch = pickAllowedFields(req.body);
-  if (patch.sku && patch.sku !== existing.sku && Product.findBySku(patch.sku)) {
-    return next(new ApiError(409, "sku already exists"));
+  const patch = pickFields(req.body, PATCHABLE_FIELDS);
+  if (Object.keys(patch).length === 0) {
+    return next(new ApiError(400, "request body must not be empty"));
   }
 
   const product = Product.update(req.params.id, patch);
@@ -56,7 +55,7 @@ export const deleteProduct = catchAsync(async (req, res, next) => {
   const deleted = Product.delete(req.params.id);
   if (!deleted) return next(new ApiError(404, "Product not found"));
 
-  res.status(200).json(successResponse(null));
+  res.status(204).end();
 });
 
 export const restoreProduct = catchAsync(async (req, res, next) => {
