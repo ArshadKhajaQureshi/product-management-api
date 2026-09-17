@@ -2,10 +2,10 @@
   "name": "product-management-api",
   "version": "1.0.0",
   "description": "REST API for managing products",
-  "main": "src/server.js",
+  "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "express": "^4.22.3",
-    "express-validator": "^7.3.2"
+    "express-validator": "^7.3.2",
+    "uuid": "^14.0.2"
   }
 }

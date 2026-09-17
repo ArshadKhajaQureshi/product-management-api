@@ -1,13 +1,17 @@
 import express from "express";
-import productRoutes from "./routes/product.routes.js";
-import { notFoundHandler, globalErrorHandler } from "./middleware/errorHandler.middleware.js";
+import productsRouter from "./routes/products.js";
+import { notFoundHandler, errorHandler } from "./middleware/errorHandler.js";
 
-const app = express();
+export const createApp = () => {
+  const app = express();
 
-app.use(express.json());
-app.use("/api/products", productRoutes);
+  app.use(express.json());
+  app.use("/products", productsRouter);
 
-app.use(notFoundHandler);
-app.use(globalErrorHandler);
+  app.use(notFoundHandler);
+  app.use(errorHandler);
 
-export default app;
+  return app;
+};
+
+export default createApp;
